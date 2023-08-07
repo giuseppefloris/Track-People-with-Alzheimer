@@ -1,102 +1,114 @@
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
 
-#define bpm_samp_siz 4
-#define bpm_rise_threshold 4
+/* Sensors pins*/
+#define BPM_SENSOR  0
+#define GPS_RX      4
+#define GPS_TX      3
+#define GPS_BAUD    9600
 
-int bpm_pin = 0;
+/* Net conf */
+#define SSID        "ssid"
+#define PASS        "pass"
+#define MQTT_SERVER "broker.mqtt.com"
+#define MQTT_CH_ID  0
+#define MQTT_PORT   1883
 
-SoftwareSerial bpm_serial(6,5); // RX, TX
+/* Debug variables */
+#define DEBUG true  //set to true for debug output, false for no debug output
+#define DEBUG_SERIAL if(DEBUG)Serial
+
+#define MQTT_CONNECT false
+
+
+/* Global variables */
+float bpm_read = 0.0;
+float lat, lng;
+
+WiFiClient nodeClient;
+PubSubClient mqttClient(nodeClient);
+
+TinyGPSPlus gps;
+SoftwareSerial gps_s(GPS_RX, GPS_TX);
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("Arduino started");
+  DEBUG_SERIAL.begin(115200);
+  DEBUG_SERIAL.println();
 
-  bpm_serial.begin(9600);
+  gps_s.begin(GPS_BAUD);
+  delay(3000);
+
+  /* Setting WiFi connection */
+  WiFi.begin(SSID, PASS);
+
+  DEBUG_SERIAL.print("Connecting...");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    DEBUG_SERIAL.print(".");
+  }
+
+  DEBUG_SERIAL.println();
+  DEBUG_SERIAL.print("Connected, IP address: ");
+  DEBUG_SERIAL.println(WiFi.localIP());
+
+  /* Setting MQTT server */
+  #if MQTT_CONNECT == true
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+  #endif
 }
 
-void loop ()
+void loop()
 {
-  /* SETUP */
   
-  /* BPM Sensor variables ----------------*/
-  float bpm_reads[bpm_samp_siz], sum;
-  long int now, ptr;
-  float last_bpm, bpm_read, start;
-  float before_bpm, cur_avg_bpm;
-  float bpm_readings[3] = {0.0, 0.0, 0.0};
-  bool rising;
-  int rise_count;
-  int bpm_n;
-  long int last_beat;
-
-
-  /* BPM readings init ---------------- */
-  for (int i = 0; i < bpm_samp_siz; i++)
-    bpm_reads[i] = 0;
-  sum = 0;
-  ptr = 0;
-
-
-  /* MAIN LOOP  ---------------- */
-  while(1)
-  {
-    
-
-    
-    /* BPM readings start ---------------- */
-    bpm_n = 0;
-    start = millis();
-    bpm_read = 0.;
-    do
+  #if MQTT_CONNECT == true
+    if (!mqttClient.connected())
     {
-      bpm_read += analogRead(bpm_pin);
-      bpm_n++;
-      now = millis();
-    }
-    while (now < start +  20);  
-    bpm_read /= bpm_n;
-    
-    sum -= bpm_reads[ptr];
-    sum += bpm_read;
-    bpm_reads[ptr] = bpm_read;
-    last_bpm = sum / bpm_samp_siz;      // average of the bpm readings
+      DEBUG_SERIAL.print("Attempting MQTT connection...");
 
-    // check for a rising curve (= a heart beat)
-    if (last_bpm > before_bpm)
-    {
-      rise_count++;
-      if (!rising && rise_count > bpm_rise_threshold)
+      // Create a random client ID
+      String clientId = "ESP8266-";
+      clientId += String(random(0xffff), HEX);
+      // Attempt to connect
+      if (client.connect(clientId.c_str()))
       {
-        // The rising flag prevents us from detecting the same rise more than once.
-        rising  = true;
-        bpm_readings[0] = millis() - last_beat;
-        last_beat = millis();
-
-        // Calculate the weighed average of heartbeat rate
-        // according  to the three last beats
-        cur_avg_bpm = 60000. / (0.4 * bpm_readings[0] + 0.3 * bpm_readings[1] + 0.3 * bpm_readings[2]);
-        
-        // sending data to the node mcu
-        bpm_serial.println(cur_avg_bpm, 2);
-
-        // Serial.print(cur_avg_bpm);
-        // Serial.print('\n');
-        
-        bpm_readings[2] = bpm_readings[1];
-        bpm_readings[1] = bpm_readings[0];
+        DEBUG_SERIAL.println("connected");
+      }
+      else
+      {
+        DEBUG_SERIAL.print("failed, rc=");
+        DEBUG_SERIAL.print(client.state());
+        DEBUG_SERIAL.println(" try again in 5 seconds");
+        // Wait 5 seconds before retrying
+        delay(5000);
       }
     }
-    else
-    {
-      rising = false;
-      rise_count = 0;
-    }
-    before_bpm = last_bpm;
-    
-    
-    ptr++;
-    ptr %= bpm_samp_siz;
+  #endif
+  
+  // Retrieve sensors' readings
+  // bpm
+  bpm_read = analogRead(BPM_SENSOR);
+  // TODO: add a simple pre-processing to check if the reading is ok or not
+  DEBUG_SERIAL.println(bpm_read);
+
+  while (gps_s.available() > 0)
+  {
+    gps.encode(gps_s.read());
   }
+
+  if (gps.location.isUpdated())
+  {
+    lat = gps.location.lat();
+    lng = gps.location.lng();
+    DEBUG_SERIAL.print("Lat= ");
+    DEBUG_SERIAL.println(lat, 6);
+    DEBUG_SERIAL.print("Lng= ");
+    DEBUG_SERIAL.println(lng, 6);
+  }
+
+  delay(20);
 }
 
  
