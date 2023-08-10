@@ -4,7 +4,7 @@
 */
 
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>
+#include <ArduinoMqttClient.h>
 #include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
 
@@ -79,8 +79,16 @@ void setup() {
 
   /* Setting MQTT server (if enabled) */
   #if MQTT_CONNECT == true
-    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
-    delay(2000);
+    while (!mqttClient.connect(MQTT_BROKER, MQTT_PORT))
+    {
+      DEBUG_SERIAL.print("MQTT connection failed! Error code = ");
+      DEBUG_SERIAL.println(mqttClient.connectError());
+
+      delay(500);
+      // TODO: may insert a max number of trials, if exceeded exits the program
+    }
+    // mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    // delay(2000);
   #endif
 
   /* Sensors setup */
@@ -109,6 +117,7 @@ void setup() {
 
 void loop()
 {
+  /*
   #if MQTT_CONNECT == true
     if (!mqttClient.connected())
     {
@@ -132,6 +141,8 @@ void loop()
       }
     }
   #endif
+  */
+  mqttClient.poll();
 
   float bpm_readings[DATA_BUFFER];
   float gps_coordinates[DATA_BUFFER][2];
@@ -227,30 +238,50 @@ void loop()
   
   for(i = 0; i < buffer_i; i++)
   {
+    /*
     DEBUG_SERIAL.print("Bpm raw: ");
     DEBUG_SERIAL.println(bpm_readings[i]);
-    
+
     DEBUG_SERIAL.print("GPS coords: ");
     DEBUG_SERIAL.println();
+    */
+    #if MQTT_CONNECT
+      mqttClient.beginMessage(bpm_topic);
+      mqttClient.print(bpm_readings[i]);
+      mqttClient.endMessage();
+    #endif
+
     for(j = 0; j < 2; j++)
     {
-      //DEBUG_SERIAL.print(coords[j]);
-      DEBUG_SERIAL.println(gps_coordinates[i][j]);
+      // DEBUG_SERIAL.print(coords[j]);
+      // DEBUG_SERIAL.println(gps_coordinates[i][j]);
+      #if MQTT_CONNECT
+        mqttClient.beginMessage(gps_topics[j]);
+        mqttClient.print(gps_coordinates[i][j]);
+        mqttClient.endMessage();
+      #endif
     }
 
+    /*
     DEBUG_SERIAL.print("Wifi strength: ");
     DEBUG_SERIAL.println(wifi_strengths[i]);
 
     DEBUG_SERIAL.print("MPU angles: ");
     DEBUG_SERIAL.println();
+    */
     for(j = 0; j < 3; j++)
     {
       // DEBUG_SERIAL.print(angles[j]);
-      DEBUG_SERIAL.println(mpu_angles[i][j]);
+      // DEBUG_SERIAL.println(mpu_angles[i][j]);
+      #if MQTT_CONNECT
+        mqttClient.beginMessage(mpu_topics[j]);
+        mqttClient.print(mpu_angles[i][j]);
+        mqttClient.endMessage();
+      #endif
     }
   }
   
-  DEBUG_SERIAL.println();
+  // DEBUG_SERIAL.println();
   delay(2000);
 }
 
