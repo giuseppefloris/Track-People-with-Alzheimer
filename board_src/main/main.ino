@@ -30,7 +30,7 @@
 #define DEBUG_SERIAL if(DEBUG)Serial
 
 #define WIFI_CONNECT  true
-#define MQTT_CONNECT  false
+#define MQTT_CONNECT  true
 #define CALIBRATE_MPU true
 
 #define DATA_BUFFER 5
@@ -46,7 +46,7 @@ int buffer_i = 0;
 
 /* Global objectse*/
 WiFiClient nodeClient;
-PubSubClient mqttClient(nodeClient);
+MqttClient mqttClient(nodeClient);
 
 TinyGPSPlus gps;
 SoftwareSerial serialGPS(GPS_RX, GPS_TX);
@@ -220,14 +220,20 @@ void loop()
     DEBUG_SERIAL.print("GPS coords: ");
     DEBUG_SERIAL.println();
     */
+
+    mqttClient.beginMessage(wifi_topic);
+    mqttClient.print(wifi_strengths[i]);
+    mqttClient.endMessage();
+
     #if MQTT_CONNECT
       mqttClient.beginMessage(bpm_topic);
+      // DEBUG_SERIAL.print(bpm_readings[i]);
       mqttClient.print(bpm_readings[i]);
       mqttClient.endMessage();
     #endif
 
-    String gps_lat_s = gps_coordinates[i][0];
-    String gps_lng_s = gps_coordinates[i][1];
+    String gps_lat_s = String(gps_coordinates[i][0], 2);
+    String gps_lng_s = String(gps_coordinates[i][1]);
     String gps_s = gps_lat_s + "," + gps_lng_s + "-";
     
     #if MQTT_CONNECT
