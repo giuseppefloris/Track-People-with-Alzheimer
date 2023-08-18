@@ -117,31 +117,6 @@ void setup() {
 
 void loop()
 {
-  /*
-  #if MQTT_CONNECT == true
-    if (!mqttClient.connected())
-    {
-      DEBUG_SERIAL.print("Attempting MQTT connection...");
-
-      // Create a random client ID
-      String clientId = "ESP8266-";
-      clientId += String(random(0xffff), HEX);
-      // Attempt to connect
-      if (client.connect(clientId.c_str()))
-      {
-        DEBUG_SERIAL.println("connected");
-      }
-      else
-      {
-        DEBUG_SERIAL.print("failed, rc=");
-        DEBUG_SERIAL.print(client.state());
-        DEBUG_SERIAL.println(" try again in 5 seconds");
-        // Wait 5 seconds before retrying
-        delay(5000);
-      }
-    }
-  #endif
-  */
   mqttClient.poll();
 
   float bpm_readings[DATA_BUFFER];
@@ -251,16 +226,15 @@ void loop()
       mqttClient.endMessage();
     #endif
 
-    for(j = 0; j < 2; j++)
-    {
-      // DEBUG_SERIAL.print(coords[j]);
-      // DEBUG_SERIAL.println(gps_coordinates[i][j]);
-      #if MQTT_CONNECT
-        mqttClient.beginMessage(gps_topics[j]);
-        mqttClient.print(gps_coordinates[i][j]);
-        mqttClient.endMessage();
-      #endif
-    }
+    String gps_lat_s = gps_coordinates[i][0];
+    String gps_lng_s = gps_coordinates[i][1];
+    String gps_s = gps_lat_s + "," + gps_lng_s + "-";
+    
+    #if MQTT_CONNECT
+      mqttClient.beginMessage(gps_topic);
+      mqttClient.print(gps_s);
+      mqttClient.endMessage();
+    #endif
 
     /*
     DEBUG_SERIAL.print("Wifi strength: ");
@@ -269,16 +243,16 @@ void loop()
     DEBUG_SERIAL.print("MPU angles: ");
     DEBUG_SERIAL.println();
     */
-    for(j = 0; j < 3; j++)
-    {
-      // DEBUG_SERIAL.print(angles[j]);
-      // DEBUG_SERIAL.println(mpu_angles[i][j]);
-      #if MQTT_CONNECT
-        mqttClient.beginMessage(mpu_topics[j]);
-        mqttClient.print(mpu_angles[i][j]);
-        mqttClient.endMessage();
-      #endif
-    }
+    String yaw_s = String(mpu_angles[i][0], 2);
+    String pitch_s = String(mpu_angles[i][1], 2);
+    String roll_s = String(mpu_angles[i][2], 2);
+    String mpu_msg = yaw_s + "," + pitch_s + "," + roll_s + "-";
+
+    #if MQTT_CONNECT
+      mqttClient.beginMessage(mpu_topic);
+      mqttClient.print(mpu_msg);
+      mqttClient.endMessage();
+    #endif
   }
   
   // DEBUG_SERIAL.println();
