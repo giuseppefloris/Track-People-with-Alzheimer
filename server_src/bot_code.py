@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-Token = '6450165920:AAE288hF7Ndjxb9N_priwOn86A8Dt9HjddQ'
+Token = '---------------------------------'
 BOT_USERNAME = '@TPWA_bot'
 
 
