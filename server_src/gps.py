@@ -1,14 +1,7 @@
 import folium
 from geopy.distance import geodesic
-from flask import Flask, jsonify, render_template
+from flask import  render_template
 
-gps_data = {}
-map_center = [33.4455, 44.5566]
-map_osm = None
-max_radius = 1000
-ref_lat = map_center[0]
-print(ref_lat)
-ref_lon = map_center[1]
 
 
 def create_map(map_center):
@@ -20,7 +13,7 @@ def map_updates(map_osm, lat, long):
     map_osm.save('templates/map_localization.html')
 
 
-def index():
+def index(map_center):
     global map_osm
     if not map_osm:
         map_osm = create_map(map_center)
@@ -28,7 +21,7 @@ def index():
     return render_template('map_localization.html')
 
 
-def map_handler(lat, long):
+def map_handler(lat, long, ref_lat, ref_lon, max_radius):
     global map_osm
     if map_osm:
         map_updates(map_osm, lat, long)
@@ -44,3 +37,13 @@ def map_handler(lat, long):
 
 def gps_operations(msg):
     print(msg)
+    """
+    gps_data = {}
+    map_center = [33.4455, 44.5566]
+    map_osm = None
+    max_radius = 1000
+    ref_lat = map_center[0]
+    print(ref_lat)
+    ref_lon = map_center[1]"""
+
+
