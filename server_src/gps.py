@@ -36,7 +36,12 @@ def map_handler(lat, long, ref_lat, ref_lon, max_radius):
 
 
 def gps_operations(msg):
-    print(msg)
+    print("GPS OPERATIONS\n")
+    print(msg.payload)
+    with open('gps_data.txt', 'wb') as f:
+        f.write(msg.payload)
+
+
     """
     gps_data = {}
     map_center = [33.4455, 44.5566]

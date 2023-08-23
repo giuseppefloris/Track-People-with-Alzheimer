@@ -1,61 +1,75 @@
-import logging
-from telegram import Bot, Update
-from telegram.ext import Updater, MessageHandler, Filters, CommandHandler
-Token = ''
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+Token = '6450165920:AAE288hF7Ndjxb9N_priwOn86A8Dt9HjddQ'
+BOT_USERNAME = '@TPWA_bot'
 
 
-def bot_operations(update, client, userdata, message):
-    bot.send_message(chat_id=userdata['chat_id'], text=message.payload.decode())
-    update.message.reply_text('ciao')
-    client.publish(MQTT_TOPIC, update.message.text)
-    update.message.reply_text('Message published to MQTT topic.')
+# commands
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text('Hello, thanks for using our service. \n Now we will'
+                                    'configure the service for you')
 
 
-updater = Updater(token=Token, use_context=True)
-dp = updater.dispatcher
-bot = Bot(Token)
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text('This are all the commands that you can use...')
 
-dp.add_handler(CommandHandler("start", start))
-dp.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
 
-updater.start_polling()
-updater.idle()
+async def update_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    with open('acc_data.txt', 'rb') as f:
+        acc = f.read()
+    with open('bpm_data.txt', 'rb') as f:
+        bpm = f.read()
+    await update.message.reply_text(f'Here your update:...\n'
+                                    f'BPM:{bpm}\n'
+                                    f'lo zio è caduto?:{acc}')
 
-'''
-class BotController:
-    def __init__(self, token, mqtt_topic):
-        self.token = token
-        self.mqtt_topic = mqtt_topic
-        self.bot = Bot(token)
-        self.updater = Updater(token=self.token, use_context=True)
-        self.dp = self.updater.dispatcher
 
-        self.dp.add_handler(CommandHandler("start", self.start))
-        self.dp.add_handler(MessageHandler(Filters.text & ~Filters.command, self.echo))
+async def position_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    with open('gps_data.txt', 'rb') as f:
+        gps = f.read()
+    await update.message.reply_text('Here the position:...\n'
+                                    f'lo zio è scappato?:{gps}')
 
-    def start(self, update, context):
-        update.message.reply_text("Hello! I'm your bot. Type something.")
 
-    def echo(self, update, context):
-        message = update.message.text
-        self.bot.send_message(chat_id=update.message.chat_id, text=message)
-        self.publish_to_mqtt(message)
-        update.message.reply_text("Message published to MQTT topic.")
+# Responses
 
-    def publish_to_mqtt(self, message):
-        # Your MQTT publishing logic here
-        pass
+def handle_response(text: str) -> str:
+    processed: str = text.lower()
 
-    def run(self):
-        self.updater.start_polling()
-        self.updater.idle()
+    if 'update' in text:
+        return 'Use the Update command'
 
-if __name__ == "__main__":
-    logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+    if 'position' in text:
+        return 'Use the postion command'
 
-    TOKEN = "your_bot_token_here"
-    MQTT_TOPIC = "your_mqtt_topic_here"
+    return 'I do not understand what you wrote'
 
-    bot_controller = BotController(TOKEN, MQTT_TOPIC)
-    bot_controller.run()
-'''
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_type: str = update.message.chat.type
+    text: str = update.message.text
+
+    response: str = handle_response(text)
+    print('Bot', response)
+    await update.message.reply_text(response)
+
+
+async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f'Update {update} caused error {context.error}')
+
+
+if __name__ == '__main__':
+    print("Starting bot...")
+    app = Application.builder().token(Token).build()
+
+    app.add_handler(CommandHandler('start', start_command))
+    app.add_handler(CommandHandler('help', help_command))
+    app.add_handler(CommandHandler('update', update_command))
+    app.add_handler(CommandHandler('position', position_command))
+
+    app.add_handler(MessageHandler(filters.TEXT, handle_message))
+
+    app.add_error_handler(error)
+    print('Polling...')
+    app.run_polling(poll_interval=3)

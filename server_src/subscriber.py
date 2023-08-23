@@ -1,4 +1,3 @@
-import time
 import paho.mqtt.client as paho
 from gps import gps_operations
 from bpm import bpm_operations

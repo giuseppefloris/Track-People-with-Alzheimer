@@ -6,5 +6,7 @@ from whereami import predict, predict_proba, crossval, locations
 
 
 def wifi_operations(msg):
-    print(msg)
+    print(msg.payload)
+    with open('wifi_data.txt', 'wb') as f:
+        f.write(msg.payload)
 
