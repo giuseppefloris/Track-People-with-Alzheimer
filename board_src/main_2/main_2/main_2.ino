@@ -67,6 +67,7 @@ void mqtt_reconnect() {
     WiFi.macAddress(mac); // get mac address
     clientID = String(mac[0]) + String(mac[4]); // use mac address to create clientID
     // Attempt to connect
+    // if (client.connect(clientId.c_str(), "user", "pass")) {
     if (client.connect(clientId.c_str())) {
       Serial.println("connected");
     } else {
@@ -136,7 +137,7 @@ void loop()
   // mqttClient.poll();
   if (!mqttClient.connected()) {
     DEBUG_SERIAL.println("Reconnecting to MQTT server...");
-    reconnect();
+    mqtt_reconnect();
   }
   mqttClient.loop();
 
@@ -254,13 +255,13 @@ void loop()
     */
 
     #if MQTT_CONNECT
-      mqttClient.beginMessage(wifi_topic);
+      mqttClient.beginMessage(clientID + "/" + wifi_topic);
       mqttClient.print(wifi_strengths[i]);
       mqttClient.endMessage();
     #endif
 
     #if MQTT_CONNECT
-      mqttClient.beginMessage(bpm_topic);
+      mqttClient.beginMessage(clientID + "/" + bpm_topic);
       // DEBUG_SERIAL.print(bpm_readings[i]);
       mqttClient.print(bpm_values[i]);
       mqttClient.endMessage();
@@ -271,7 +272,7 @@ void loop()
       String gps_lng_s = String(gps_coordinates[i][1], 2);
       String gps_s = gps_lat_s + "," + gps_lng_s;
     
-      mqttClient.beginMessage(gps_topic);
+      mqttClient.beginMessage(clientID + "/" + gps_topic);
       mqttClient.print(gps_s);
       mqttClient.endMessage();
     #endif
@@ -290,7 +291,7 @@ void loop()
       String roll_s = String(mpu_angles[i][2], 2);
       String mpu_msg = yaw_s + "," + pitch_s + "," + roll_s;
 
-      mqttClient.beginMessage(mpu_topic);
+      mqttClient.beginMessage(clientID + "/" + mpu_topic);
       mqttClient.print(mpu_msg);
       mqttClient.endMessage();
     #endif
