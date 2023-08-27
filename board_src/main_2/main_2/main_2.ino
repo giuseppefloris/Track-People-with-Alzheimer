@@ -62,18 +62,20 @@ MPU9250 mpu;
 void mqtt_reconnect() {
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
+    DEBUG_SERIAL.print("Attempting MQTT connection...");
     byte mac[5]; // create client ID from mac address
     WiFi.macAddress(mac); // get mac address
     clientID = String(mac[0]) + String(mac[4]); // use mac address to create clientID
+    DEBUG_SERIAL.print("ClientID: ");
+    DEBUG_SERIAL.println(clientID);
     // Attempt to connect
     // if (client.connect(clientId.c_str(), "user", "pass")) {
     if (client.connect(clientId.c_str())) {
-      Serial.println("connected");
+      DEBUG_SERIAL.println("connected");
     } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
+      DEBUG_SERIAL.print("failed, rc=");
+      DEBUG_SERIAL.print(client.state());
+      DEBUG_SERIAL.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
     }
