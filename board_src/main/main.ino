@@ -33,7 +33,6 @@
 #define MQTT_CONNECT  true
 #define CALIBRATE_MPU false
 
-#define DATA_BUFFER 5
 
 /* Global variables */
 float bpm_read;
@@ -42,7 +41,6 @@ int   wifi_strength;
 float yaw, pitch, roll;
 
 int gps_flag = 0;
-int buffer_i = 0;
 
 /* Global variables for BPM processing */
 
@@ -122,38 +120,29 @@ void loop()
 {
   mqttClient.poll();
 
-  float bpm_readings[DATA_BUFFER][2]; // store bpm_raw and millis() time
-  int   bpm_values[DATA_BUFFER];
-  float gps_coordinates[DATA_BUFFER][2];
-  int   wifi_strengths[DATA_BUFFER];
-  float mpu_angles[DATA_BUFFER][3];
-  uint8_t i, j = 0;
+  float bpm_readings[2]; // store bpm_raw and millis() time
+  int   bpm_values;
+  float gps_coordinates[2];
+  int   wifi_strengths;
+  float mpu_angles[3];
   uint8_t gps_flag = 0;
 
 
-  for(i = 0; i < DATA_BUFFER; i++)
-  {
-    bpm_readings[i][0] = 0.0;
-    bpm_readings[i][1] = 0.0;
-    wifi_strengths[i] = 0;
-    
-    for(j = 0; j < 2; j++)
-      gps_coordinates[i][j] = 0.0;
-    for(j = 0; j < 3; j++)
-      mpu_angles[i][j] = 0.0;
-  }
-  
+    for(int j = 0; j < 2; j++)
+      gps_coordinates[j] = 0.0;
+    for(int j = 0; j < 3; j++)
+      mpu_angles[j] = 0.0;
+
+
   /* Retrieving sensors' readings */
-  for(buffer_i = 0; buffer_i <= DATA_BUFFER; buffer_i++)
-  {
     // BPM sensor (raw value)
     bpm_read = analogRead(BPM_SENSOR);
-    bpm_readings[buffer_i][0] = bpm_read;
-    bpm_readings[buffer_i][1] = millis();
+    bpm_readings[0] = bpm_read;
+    bpm_readings[1] = millis();
     // TODO: add a simple pre-processing to check if the reading is ok or not
     // DEBUG_SERIAL.print("BPM raw: ");
     // DEBUG_SERIAL.println(bpm_read);
-    
+
     // GPS coordinates reading
     while (serialGPS.available() > 0 && gps_flag == 0)
     {
@@ -163,39 +152,39 @@ void loop()
       {
         lat = gps.location.lat();
         lng = gps.location.lng();
-        gps_coordinates[buffer_i][0] = lat;
-        gps_coordinates[buffer_i][1] = lng;
+        gps_coordinates[0] = lat;
+        gps_coordinates[1] = lng;
 
-        /*
+
         DEBUG_SERIAL.print("Lat= ");
         DEBUG_SERIAL.println(lat, 6);
         DEBUG_SERIAL.print("Lng= ");
         DEBUG_SERIAL.println(lng, 6);
-        */
-        
+
+
         gps_flag = 1;
       }
     }
     // DEBUG_SERIAL.println();
-    
-    // WiFi strength (RSSI in dBm)  
+
+    // WiFi strength (RSSI in dBm)
     wifi_strength = WiFi.RSSI();
-    wifi_strengths[buffer_i] = wifi_strength;
+    wifi_strengths = wifi_strength;
     /*
     DEBUG_SERIAL.print("WiFi strength: ");
     DEBUG_SERIAL.println(wifi_strength);
     DEBUG_SERIAL.println();
     */
-    
+
     // MPU readings
     if (mpu.update())
     {
       yaw = mpu.getYaw();
       pitch = mpu.getPitch();
       roll = mpu.getRoll();
-      mpu_angles[buffer_i][0] = yaw;
-      mpu_angles[buffer_i][1] = pitch;
-      mpu_angles[buffer_i][2] = roll;
+      mpu_angles[0] = yaw;
+      mpu_angles[1] = pitch;
+      mpu_angles[2] = roll;
 
       /*
       DEBUG_SERIAL.print("Yaw: ");
@@ -213,7 +202,7 @@ void loop()
     /* Set or reset variables */
     gps_flag = 0;
     delay(10);
-  }
+
 
   /* Processing BPM raw values to obtain real BPM */
 
@@ -222,14 +211,13 @@ void loop()
 
   DEBUG_SERIAL.print("Sending data to the platform...");
   DEBUG_SERIAL.println();
-  
-  for(i = 0; i < buffer_i; i++)
-  {
+
+
     /*
     DEBUG_SERIAL.print("Bpm raw: ");
     DEBUG_SERIAL.println(bpm_readings[i]);
-    
-    
+
+
     DEBUG_SERIAL.print("GPS coords: ");
     DEBUG_SERIAL.println(gps_coordinates[i][0]);
     DEBUG_SERIAL.println(gps_coordinates[i][1]);
@@ -237,22 +225,22 @@ void loop()
 
     #if MQTT_CONNECT
       mqttClient.beginMessage(wifi_topic);
-      mqttClient.print(wifi_strengths[i]);
+      mqttClient.print(wifi_strengths);
       mqttClient.endMessage();
     #endif
 
     #if MQTT_CONNECT
       mqttClient.beginMessage(bpm_topic);
       // DEBUG_SERIAL.print(bpm_readings[i]);
-      mqttClient.print(bpm_values[i]);
+      mqttClient.print(bpm_values);
       mqttClient.endMessage();
     #endif
 
     #if MQTT_CONNECT
-      String gps_lat_s = String(gps_coordinates[i][0], 2);
-      String gps_lng_s = String(gps_coordinates[i][1], 2);
+      String gps_lat_s = String(gps_coordinates[0], 2);
+      String gps_lng_s = String(gps_coordinates[1], 2);
       String gps_s = gps_lat_s + "," + gps_lng_s;
-    
+
       mqttClient.beginMessage(gps_topic);
       mqttClient.print(gps_s);
       mqttClient.endMessage();
@@ -265,21 +253,19 @@ void loop()
     DEBUG_SERIAL.print("MPU angles: ");
     DEBUG_SERIAL.println();
     */
-    
+
     #if MQTT_CONNECT
-      String yaw_s = String(mpu_angles[i][0], 2);
-      String pitch_s = String(mpu_angles[i][1], 2);
-      String roll_s = String(mpu_angles[i][2], 2);
+      String yaw_s = String(mpu_angles[0], 2);
+      String pitch_s = String(mpu_angles[1], 2);
+      String roll_s = String(mpu_angles[2], 2);
       String mpu_msg = yaw_s + "," + pitch_s + "," + roll_s;
 
       mqttClient.beginMessage(mpu_topic);
       mqttClient.print(mpu_msg);
       mqttClient.endMessage();
     #endif
-  }
-  
+
+
   // DEBUG_SERIAL.println();
   delay(2000);
 }
-
- 

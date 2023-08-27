@@ -1,54 +1,76 @@
 import folium
-from geopy.distance import geodesic
-from flask import  render_template
+import webbrowser
+import geopy.distance
+from PIL import Image
+import io
+import os
+from wifi import in_out_position
+outside_house_cord = False
 
+def retrieve_position():
 
+    with open("gps_data.txt", 'r') as f:
+        location = f.read()
 
-def create_map(map_center):
-    return folium.Map(location=map_center, zoom_start=12)
+    location = str(location)
+    location = location.replace("'", '')
+    location = location.split(',')
+    location = [float(i) for i in location]
+    map = folium.Map(location=location, zoom_start=50)
+    map.add_child(folium.Marker(location=location, popup='Tughlakabad',
+                                icon=folium.Icon(color='green')))
 
-
-def map_updates(map_osm, lat, long):
-    folium.Marker(location=[lat, long], popup='Received coordinates').add_to(map_osm)
-    map_osm.save('templates/map_localization.html')
-
-
-def index(map_center):
-    global map_osm
-    if not map_osm:
-        map_osm = create_map(map_center)
-    map_updates(map_osm, 0, 0)
-    return render_template('map_localization.html')
-
-
-def map_handler(lat, long, ref_lat, ref_lon, max_radius):
-    global map_osm
-    if map_osm:
-        map_updates(map_osm, lat, long)
-        current_location = (lat, long)
-        reference_location = (ref_lat, ref_lon)
-        distance = geodesic(current_location, reference_location).meters
-
-        if distance <= max_radius:
-            print("person within the radius")
-        else:
-            print("person has exceed the distance")
-
+    img_data = map._to_png(5)
+    img = Image.open(io.BytesIO(img_data))
+    img.save('map.png')
+    img = os.path.abspath("map.png")
+    webbrowser.open("map.html")
+    return img
 
 def gps_operations(msg):
+
+    global outside_house_cord
+
     print("GPS OPERATIONS\n")
-    print(msg.payload)
-    with open('gps_data.txt', 'wb') as f:
-        f.write(msg.payload)
+    position = str(msg.payload).replace('b', '')
+    print(position)
+
+    if (not outside_house_cord) and (position != "'0.00,0.00'"):
+        with open('gps_data_house.txt', 'w') as f:
+            f.write(position)
+        outside_house_cord = True
+
+    if outside_house_cord and position != "'0.00,0.00'":
+        with open('gps_data_house.txt', 'r') as f:
+            house_cord = f.read()
+            in_out = in_out_position()
+
+            if in_out == 'outside':
+                if geofence(house_cord, position):
+                    with open('chat_id.txt', 'r') as f:
+                        chat_id = f.read()
+                        print('OUT OF Geofence')
+                        #send(chat_id, 'Out of the safe zone! '
+                                      #'Use the /position command to check the current position')
 
 
-    """
-    gps_data = {}
-    map_center = [33.4455, 44.5566]
-    map_osm = None
-    max_radius = 1000
-    ref_lat = map_center[0]
-    print(ref_lat)
-    ref_lon = map_center[1]"""
 
+    with open('gps_data.txt', 'w') as f:
+        f.write(position)
+
+def geofence(house, current, maximum_distance = 3):
+    print('Calculating Geofence')
+    house = house.replace("'", '')
+    current = current.replace("'", '')
+    house = house.split(',')
+    current = current.split(',')
+
+    house = [float(i) for i in house]
+    current = [float(i) for i in current]
+
+    distance = geopy.distance.geodesic(house, current).m
+    if distance > maximum_distance:
+        print("Out of the safezone!!")
+        return True
+    return False
 
