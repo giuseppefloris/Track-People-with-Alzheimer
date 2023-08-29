@@ -77,10 +77,10 @@ def handle_authentication(text: str) -> str:
 def handle_response(text: str) -> str:
     processed: str = text.lower()
 
-    if 'update' in text:
+    if 'update' in processed:
         return 'Use the Update command'
 
-    if 'position' in text:
+    if 'position' in processed:
         return 'Use the postion command'
 
     return 'I do not understand what you wrote'

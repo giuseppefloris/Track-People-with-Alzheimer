@@ -10,11 +10,9 @@ predicted = False
 def learn_inside_locations(label):
 
     data = []
-    label_list = []
-    if not os.path.exists('X.pkl'):
-        pickle.dump(np.array(data), open('X.pkl', 'wb'))
-        pickle.dump(np.array(label_list), open('y.pkl', 'wb'))
 
+    # query to retrieve gps data
+    wifi_reading = Query()
     for i in range(4):
 
         with open('wifi_data.txt') as f:
@@ -23,14 +21,6 @@ def learn_inside_locations(label):
         wifi_data = wifi_data.replace("b", "")
         data.append(wifi_data)
         time.sleep(5)
-    X = pickle.load(open('X.pkl', 'rb'))
-    y = pickle.load(open('y.pkl', 'rb'))
-    if X.shape[0] == 0:
-        X = np.array(data, dtype=int)
-        y = np.array(label)
-    else:
-        X = np.vstack((X, np.array(data)))
-        y = np.hstack((y, np.array(label)))
 
     pickle.dump(X, open('X.pkl', 'wb'))
     pickle.dump(y, open('y.pkl', 'wb'))
