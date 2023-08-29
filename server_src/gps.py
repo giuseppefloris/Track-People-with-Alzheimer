@@ -5,15 +5,15 @@ from PIL import Image
 import io
 import os
 from wifi import in_out_position
-outside_house_cord = False
+from tinydb import TinyDB, Query
 
-def retrieve_position():
 
-    with open("gps_data.txt", 'r') as f:
-        location = f.read()
-
-    location = str(location)
-    location = location.replace("'", '')
+def retrieve_position(id):
+    db = TinyDB('mqtt_database.json')
+    gps_table = db.table('gps_readings')
+    coord = Query()
+    all_coord = gps_table.search(coord.client_id.all(id))
+    location = str(all_coord[:-1])
     location = location.split(',')
     location = [float(i) for i in location]
     map = folium.Map(location=location, zoom_start=50)
@@ -22,46 +22,44 @@ def retrieve_position():
 
     img_data = map._to_png(5)
     img = Image.open(io.BytesIO(img_data))
-    img.save('map.png')
-    img = os.path.abspath("map.png")
-    webbrowser.open("map.html")
+    img.save('map' + 'id' + '.png')
+    img = os.path.abspath('map' + 'id' + '.png')
+    # webbrowser.open('map' +'id'+'.png')
+    db.close()
     return img
 
-def gps_operations(msg):
 
-    global outside_house_cord
+def gps_operations(id):
+    db = TinyDB('mqtt_database.json')
+    gps_table = db.table('gps_readings')
+    coord = Query()
+    all_coord = gps_table.search(coord.client_id.all(id))
+    location = all_coord[-1]
 
-    print("GPS OPERATIONS\n")
-    position = str(msg.payload).replace('b', '')
-    print(position)
+    gps_house_coord = db.table('gps_house_coord')
+    houde_coord = Query()
+    h_location = gps_house_coord.search(houde_coord.client_id.all(id))
+    location = location['coord']
+    if (len(h_location) == 0) and (location != "0.000000,0.000000"):
+        gps_house_coord.insert({'client_id': id, 'coord': location})
 
-    if (not outside_house_cord) and (position != "'0.00,0.00'"):
-        with open('gps_data_house.txt', 'w') as f:
-            f.write(position)
-        outside_house_cord = True
+    if (len(h_location) != 0) and location != "0.000000,0.000000":
+        in_out = in_out_position(id)
+        if in_out == 'outside':
+            if h_location:
+                if geofence(h_location, location):
+                    print('OUT OF Geofence')
+                    chat_id = db.table('chat_id')
+                    chat = Query()
+                    all_chats = chat_id.search(chat.client_id.all(id))
+                    # send(all_chats[0], 'Out of the safe zone! '
+                    # 'Use the /position command to check the current position')
 
-    if outside_house_cord and position != "'0.00,0.00'":
-        with open('gps_data_house.txt', 'r') as f:
-            house_cord = f.read()
-            in_out = in_out_position()
-
-            if in_out == 'outside':
-                if geofence(house_cord, position):
-                    with open('chat_id.txt', 'r') as f:
-                        chat_id = f.read()
-                        print('OUT OF Geofence')
-                        #send(chat_id, 'Out of the safe zone! '
-                                      #'Use the /position command to check the current position')
-
+    db.close()
 
 
-    with open('gps_data.txt', 'w') as f:
-        f.write(position)
-
-def geofence(house, current, maximum_distance = 3):
+def geofence(house, current, maximum_distance=3):
     print('Calculating Geofence')
-    house = house.replace("'", '')
-    current = current.replace("'", '')
     house = house.split(',')
     current = current.split(',')
 
@@ -70,7 +68,6 @@ def geofence(house, current, maximum_distance = 3):
 
     distance = geopy.distance.geodesic(house, current).m
     if distance > maximum_distance:
-        print("Out of the safezone!!")
+        print("Out of the safe-zone!!")
         return True
     return False
-

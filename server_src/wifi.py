@@ -5,130 +5,156 @@ from sklearn.svm import SVC
 from sklearn.preprocessing import LabelEncoder
 from datetime import datetime
 import pickle
+from tinydb import TinyDB, Query
 
-predicted = False
-def learn_inside_locations(label):
+counter = 0
+
+
+def learn_inside_locations(label, id):
+    db = TinyDB('mqtt_database.json')
+    clients_table = db.table('clients_table')
+    Client = Query()
+    client_id = clients_table.search(Client.chat_id==id)
+
+    inside_locations = db.table('inside_locations')
+    wifi_table = db.table('wifi_strength_readings')
+    _label = Query()
+    result = inside_locations.search((_label.client_id == client_id) & (_label.label == label))
+    if result:
+        return "Label already registered"
 
     data = []
 
     # query to retrieve gps data
     wifi_reading = Query()
     for i in range(4):
+        wifi_readings = wifi_table.search(wifi_reading.client_id.all==client_id)
+        wifi_data = str(wifi_readings[:-1])
 
-        with open('wifi_data.txt') as f:
-            wifi_data = f.read()
-            f.close()
-        wifi_data = wifi_data.replace("b", "")
         data.append(wifi_data)
         time.sleep(5)
 
-    pickle.dump(X, open('X.pkl', 'wb'))
-    pickle.dump(y, open('y.pkl', 'wb'))
-    print(X)
-    print(y)
+    inside_locations.insert({'client_id': client_id, 'coord_list': data, 'label': label})
+    db.close()
 
-def train_model():
-    with open('predicted_labels', 'w') as f:
-        t = time.time()
-        f.write(f'{time}'+ ' - label')
-        f.close()
+
+def train_model(id):
 
     print('training the model')
-    X = pickle.load(open('X.pkl', 'rb'))
-    y = pickle.load(open('y.pkl', 'rb'))
+    db = TinyDB('mqtt_database.json')
+    clients_table = db.table('clients_table')
+    Client = Query()
+    client_id = clients_table.search(Client.chat_id==id)
+
+    inside_locations = db.table('inside_locations')
+    DataEntry = Query()
+    result = inside_locations.search(DataEntry.client_id==client_id)
+
+    data_list = []
+    label_list = []
+
+    for entry in result:
+        data_list.append(entry['coord_list'])
+        label_list.append(entry['label'])
+
+    X = np.array(data_list)
+    y = np.array(label_list)
     clf = SVC()
-
-
     # y = [i[0] for i in y]
     le = LabelEncoder()
     le.fit(y)
     y = le.transform(y)
 
     clf.fit(X, y)
-    pickle.dump(clf, open('model.pkl', 'wb'))
-    pickle.dump(le, open('label_encoding.pkl', 'wb'))
+    pickle.dump(clf, open('model' + str(client_id) + '.pkl', 'wb'))
+    pickle.dump(le, open('label_encoding' +  str(client_id) + '.pkl', 'wb'))
+    db.close()
 
 
+def predict(id):
+    db = TinyDB('mqtt_database.json')
+    clients_table = db.table('clients_table')
+    Client = Query()
+    client_id = clients_table.search(Client.chat_id==id)
+    inside_locations = db.table('inside_locations')
+    wifi_table = db.table('wifi_strength_readings')
 
-def predict():
-    global predicted
+    clf = pickle.load(open('model' +  str(client_id) + '.pkl', 'rb'))
+    le = pickle.load(open('label_encoding' +  str(client_id) + '.pkl', 'rb'))
 
-    predicted = True
-    clf = pickle.load(open('model.pkl', 'rb'))
-    le = pickle.load(open('label_encoding.pkl', 'rb'))
+    wifi_reading = Query()
     data = []
     for i in range(4):
-        with open('wifi_data.txt') as f:
-            wifi_data = f.read()
-            f.close()
-        wifi_data = wifi_data.replace("b", "")
+        wifi_readings = wifi_table.search(wifi_reading.client_id.all==client_id)
+        wifi_data = str(wifi_readings[:-1])
+
         data.append(wifi_data)
         time.sleep(5)
 
-
-    X_test = np.array(data).reshape((1,4))
+    X_test = np.array(data).reshape((1, 4))
+    print(X_test)
     prediction = clf.predict(X_test)
-
     prediction = le.inverse_transform(prediction)
-    with open('predicted_labels', 'rw') as f:
-        previous_label = f.read()
-        previous_label = previous_label.split('-')
-        if previous_label[1] != prediction:
-            t = time.time()
-            f.write(f'{time}' + f' - {prediction}')
-            occupancy = ' - '
-        else:
-            previous_time = float(previous_label[0])
-            t = time.time()
-            timestamp = t - previous_time
-            occupancy = datetime.fromtimestamp(timestamp)
 
+    DataEntry = Query()
 
+    result = inside_locations.search(DataEntry.client_id==client_id)
+    sorted_entries = sorted(result, key=lambda entry: entry.get('prediction_time',
+                                                                '1970-01-01 00:00:00'), reverse=True)
+    newest_entry = sorted_entries[0] if sorted_entries else None
+    newest_label = newest_entry['label'] if newest_entry else None
+
+    if newest_label == prediction:
+        t0 = newest_entry['prediction_time']
+        t1 = time.time()
+        t0 = datetime.fromtimestamp(t0)
+        t1 = datetime.fromtimestamp(t1)
+        occupancy = t1 - t0
+        inside_locations.update({'prediction_time': t1},
+                                (DataEntry.client_id == client_id) & (DataEntry.label == prediction))
+
+    else:
+        t1 = time.time()
+        inside_locations.update({'prediction_time': t1},
+                                (DataEntry.client_id == client_id) & (DataEntry.label == prediction))
+        occupancy = 'Just Moved'
+    db.close()
     return prediction, occupancy
 
 
+def in_out_position(id):
+    db = TinyDB('mqtt_database.json')
+    gps_table = db.table('gps_readings')
+    wifi_table = db.table('wifi_strength_readings')
+    gps_house_coord = db.table('gps_house_coord')
 
-def in_out_position():
-    print("in out computation")
-    with open('gps_data.txt', 'rb') as f:
-        gps = f.read()
-    with open('wifi_data.txt') as f:
-        wifi_data = f.read()
-    gps = str(gps)
-    gps = gps.replace("b", "")
-    gps = gps.replace("-", "")
-    wifi_data = str(wifi_data)
-    wifi_data = wifi_data.replace("b", "")
-    wifi_data = wifi_data.replace("-", "")
-    wifi_data = wifi_data.replace("'", "")
-    wifi_data = int(wifi_data)
+    DataEntry = Query()
+    gps_data = gps_table.search(DataEntry.client_id==id)
+    h_gps_data = gps_house_coord.search(DataEntry.client_id==id)
 
-    if gps == '0.00,0.00':
+    gps_data = gps_data[:-1]
+    h_gps_data = h_gps_data[:-1]
+
+    print("in/out computation")
+
+    if gps_data == '0.000000,0.000000':
         position = 'inside'
     else:
-        if wifi_data < 80:
+        if gps_data == h_gps_data:
             position = 'inside'
         else:
             position = 'outside'
     print(position)
+    db.close()
     return position
 
 
-def wifi_operations(msg):
-    print('WIFI OPERATIONS')
-    print(msg.payload)
-    with open('wifi_data.txt', 'wb') as f:
-        f.write(msg.payload)
-        f.close()
+def wifi_operations(id):
+    global counter
 
+    counter += 1
 
-s = sched.scheduler(time.time, time.sleep)
-def periodical_prediction(sc):
-    print('Periodical Prediction')
-    predict()
-    sc.enter(120, 1, periodical_prediction, (sc,))
-
-s.enter(120, 1, periodical_prediction, (s,))
-
-if predicted:
-    s.run()
+    if counter == 100 and (in_out_position(id) == 'inside'):
+        print("Periodical Prediction")
+        predict(id)
+        counter = 0

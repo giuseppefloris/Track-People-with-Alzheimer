@@ -11,3 +11,5 @@ nanodb
 folium
 selenium
 pillow
+tinydb
+cryptography
