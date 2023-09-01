@@ -3,11 +3,11 @@ from gps import gps_operations
 from wifi import wifi_operations
 from tinydb import TinyDB, Query
 
-
 MQTT_BROKER_HOST = "localhost"
 MQTT_BROKER_PORT = 1883
 
-# id = 164181 secret = gAAAAABk7S
+
+# id = 164181 secret = gAAAAABk7Sh
 
 
 def on_message(client, userdata, message):
@@ -20,7 +20,8 @@ def on_message(client, userdata, message):
     existent_client = Query()
     result = clients_table.search(existent_client.client_id == clnt_id)
     if not result:
-        clients_table.insert({'client_id': clnt_id, 'chat_id': ''})
+        clients_table.insert({'client_id': clnt_id, 'chat_id': '', 'auth': False, 'setup': False,
+                              'train': False, 'count': 0,'count_max': False, 'OOS': False, 'geofence': False})
 
     if topic == "gps":
         message = str(message.payload)
@@ -46,9 +47,8 @@ clients_table = db.table('clients')
 gps_table = db.table('gps_readings')
 wifi_table = db.table('wifi_strength_readings')
 gps_house_coord = db.table('gps_house_coord')
-chat_id = db.table('chat_id')
 inside_locations = db.table('inside_locations')
-#db.close()
+
 
 client = paho.Client("Server")
 client.on_message = on_message

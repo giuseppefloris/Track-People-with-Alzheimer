@@ -8,12 +8,17 @@ from wifi import in_out_position
 from tinydb import TinyDB, Query
 
 
+
 def retrieve_position(id):
+    print('retrieve position')
     db = TinyDB('mqtt_database.json')
     gps_table = db.table('gps_readings')
     coord = Query()
+    print(id)
     all_coord = gps_table.search(coord.client_id.all(id))
-    location = str(all_coord[:-1])
+    location = all_coord[-1]
+    print(location)
+    location = location['coord']
     location = location.split(',')
     location = [float(i) for i in location]
     map = folium.Map(location=location, zoom_start=50)
@@ -22,8 +27,8 @@ def retrieve_position(id):
 
     img_data = map._to_png(5)
     img = Image.open(io.BytesIO(img_data))
-    img.save('map' + 'id' + '.png')
-    img = os.path.abspath('map' + 'id' + '.png')
+    img.save('map' + id + '.png')
+    img = os.path.abspath('map' + id + '.png')
     # webbrowser.open('map' +'id'+'.png')
     db.close()
     return img
@@ -47,19 +52,32 @@ def gps_operations(id):
         in_out = in_out_position(id)
         if in_out == 'outside':
             if h_location:
-                if geofence(h_location, location):
+                h_location = h_location[0]['coord']
+                clients_table = db.table('clients')
+                oos = Query()
+                results = clients_table.search(oos.client_id == id)
+                oos = results[0]['OOS']
+                radius = results[0]['geofence']
+                if geofence(h_location, location, int(radius)) and not oos:
                     print('OUT OF Geofence')
-                    chat_id = db.table('chat_id')
+                    clients_table = db.table('clients')
                     chat = Query()
-                    all_chats = chat_id.search(chat.client_id.all(id))
-                    # send(all_chats[0], 'Out of the safe zone! '
-                    # 'Use the /position command to check the current position')
+                    all_chats = clients_table.search(chat.client_id.all(id))
+                    print(all_chats)
+                    all_chats = all_chats[0]
+                    from bot_code import send
+                    print(all_chats['chat_id'])
+                    send(all_chats['chat_id'], 'Out of the safe zone! '
+                                               'Use the /position command to check the current position')
+                    update_flag = Query()
+                    clients_table.update({'OOS':True}, (update_flag.client_id == id))
 
     db.close()
 
 
-def geofence(house, current, maximum_distance=3):
-    print('Calculating Geofence')
+def geofence(house, current, maximum_distance=30):
+    print('h_location', house)
+    print('location', current)
     house = house.split(',')
     current = current.split(',')
 
@@ -68,6 +86,5 @@ def geofence(house, current, maximum_distance=3):
 
     distance = geopy.distance.geodesic(house, current).m
     if distance > maximum_distance:
-        print("Out of the safe-zone!!")
         return True
     return False
