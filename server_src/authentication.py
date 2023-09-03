@@ -1,9 +1,6 @@
 from tinydb import TinyDB, Query
+from secret import secret_key
 import hashlib
-from cryptography.fernet import Fernet
-
-secret_key =  b'6SGa2U3RtT_w4JvHYibd9LWF6CLE1K46Ef65XMen72c=' #Fernet.generate_key()
-#print("SECRET: ", secret_key.decode())
 
 
 def encrypt(input_string, key = secret_key):

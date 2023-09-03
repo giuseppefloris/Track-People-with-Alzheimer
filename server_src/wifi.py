@@ -7,6 +7,7 @@ import pickle
 from tinydb import TinyDB, Query
 from datetime import datetime
 
+
 def learn_inside_locations(lbl, id):
     print('learn inside locations')
     db = TinyDB('mqtt_database.json')
@@ -87,7 +88,7 @@ def train_model(id):
     db.close()
 
 
-def predict(client, periodical = False):
+def predict(client, periodical=False):
     print('Predicting')
     if not periodical:
         db = TinyDB('mqtt_database.json')
@@ -130,11 +131,11 @@ def predict(client, periodical = False):
     if len(flag) == 0:
         print('adding first flag')
         t = time.time()
-        inside_locations.update({'flag': 1, 'prediction_time':t},
+        inside_locations.update({'flag': 1, 'prediction_time': t},
                                 (last_position.client_id == client) & (last_position.label == prediction[0]))
         occupancy = 'Just Moved'
 
-    if len(flag)!=0:
+    if len(flag) != 0:
         flag = flag[0]
         print('checking the flags label')
         if flag['label'] == prediction:
@@ -180,7 +181,7 @@ def in_out_position(id):
         position = 'inside'
     else:
         if (len(h_gps_data) != 0) and (gps_data['coord'] == h_gps_data['coord']):
-            position = 'inside/garden'
+            position = 'inside'
         else:
             position = 'outside'
     print(position)

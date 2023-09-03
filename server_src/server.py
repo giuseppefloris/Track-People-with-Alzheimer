@@ -7,7 +7,6 @@ MQTT_BROKER_HOST = "localhost"
 MQTT_BROKER_PORT = 1883
 
 
-# id = 164181 secret = gAAAAABk7Sh
 
 
 def on_message(client, userdata, message):

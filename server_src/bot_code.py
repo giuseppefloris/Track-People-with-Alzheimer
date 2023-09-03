@@ -7,9 +7,10 @@ from wifi import learn_inside_locations, train_model, predict
 from authentication import authenticate
 from gps import retrieve_position
 from tinydb import TinyDB, Query
+from secret import Token
 import requests
 
-Token = '6450165920:AAF0pJ0I4vhDFMMe8yJ4PwcN0G4XlkVC5Kc'
+
 BOT_USERNAME = '@TPWA_bot'
 
 
